@@ -1,0 +1,203 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model AnneeAcademique {
+  id          String   @id @default(uuid())
+  libelle     String
+  date_debut  DateTime
+  date_fin    DateTime
+  actif       Boolean  @default(false)
+}
+
+model Departement {
+  id      String @id @default(uuid())
+  libelle String
+  code    String @unique
+}
+
+model User {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  password       String
+  nom            String
+  prenom         String
+  role           String    @default("enseignant")
+  id_profil      String?
+  id_departement String?
+  id_contrat     String?
+  taux_horaire   Float?
+  salaire_base   Float?
+  grade          String?
+  statut         String?   @default("Vacataire") // Permanent, Vacataire
+  telephone      String?
+  adresse        String?
+  iban           String?
+  banque         String?
+  sexe           String?
+  actif          Boolean   @default(true)
+  photo_url      String?
+  niveaux        String[]  @default([])
+  diplomes       String[]  @default([])
+  specialisation String?
+  last_login     DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  activites      Activite[]
+  paiements      Paiement[]
+  documents      UserDocument[]
+  disponibilites Disponibilite[]
+}
+
+model Disponibilite {
+  id              String   @id @default(uuid())
+  id_utilisateur  String
+  jour            String   // Lundi, Mardi, etc.
+  creneau         String   // Matin, Apres-midi, Soir
+  actif           Boolean  @default(true)
+  date_maj        DateTime @default(now())
+
+  user            User     @relation(fields: [id_utilisateur], references: [id])
+}
+
+model Filiere {
+  id          String   @id @default(uuid())
+  libelle     String
+  code        String   @unique
+  description String?
+  cours       Cours[]
+}
+
+model Niveau {
+  id      String  @id @default(uuid())
+  libelle String
+  cours   Cours[]
+}
+
+model Cours {
+  id                  String   @id @default(uuid())
+  intitule            String
+  code_cours          String   @unique
+  nb_heures           Float
+  nb_credits          Int?
+  nb_sequences        Int
+  id_filiere          String
+  id_niveau           String
+  id_semestre         String
+  id_annee_academique String
+
+  filiere             Filiere  @relation(fields: [id_filiere], references: [id])
+  niveau              Niveau   @relation(fields: [id_niveau], references: [id])
+  activites           Activite[]
+}
+
+model Activite {
+  id                  String   @id @default(uuid())
+  id_user             String
+  id_cours            String
+  id_ressource        String?
+  type_action         String   // Conception, MAJ
+  niveau_complexite   String   @default("N1") // N1, N2, N3
+  nb_sequences        Int
+  volume_horaire      Float
+  montant             Float?
+  statut              String   @default("en_attente") // en_attente, soumise, valide, rejete
+  motif_rejet         String?
+  id_etat_heures      String?
+  date_saisie         DateTime @default(now())
+  paye                Boolean  @default(false)
+  date_paiement       DateTime?
+
+  user                User     @relation(fields: [id_user], references: [id])
+  cours               Cours    @relation(fields: [id_cours], references: [id])
+}
+
+model Paiement {
+  id                   String   @id @default(uuid())
+  id_user              String
+  montant              Float
+  mode_paiement        String
+  reference_paiement   String
+  periode              String
+  statut               String   @default("en_attente")
+  date_paiement        DateTime @default(now())
+
+  user                 User     @relation(fields: [id_user], references: [id])
+}
+
+model AuditLog {
+  id              String   @id @default(uuid())
+  action          String
+  userId          String?
+  userEmail       String?
+  details         String?
+  timestamp       DateTime @default(now())
+}
+
+model Notification {
+  id              String   @id @default(uuid())
+  id_utilisateur  String
+  titre           String
+  message         String
+  date            DateTime @default(now())
+  lu              Boolean  @default(false)
+  type            String   @default("info")
+}
+
+model EtatHeures {
+  id                String   @id @default(uuid())
+  id_utilisateur    String
+  periode           String
+  total_heures      Float
+  heures_complementaires Float?
+  nb_activites      Int
+  montant_total     Float
+  statut            String   @default("brouillon")
+  date_generation   DateTime @default(now())
+  nom_enseignant    String?
+}
+
+model Ressource {
+  id          String   @id @default(uuid())
+  id_cours    String
+  titre       String
+  type        String
+  description String?
+}
+
+model Sequence {
+  id           String   @id @default(uuid())
+  id_ressource String
+  numero       Int
+  titre        String
+  description  String?
+}
+
+model UserDocument {
+  id             String   @id @default(uuid())
+  id_user        String
+  nom            String
+  type           String   // Contrat, Bulletin de Paie, Recapitulatif, etc.
+  file_url       String
+  date_upload    DateTime @default(now())
+  user           User     @relation(fields: [id_user], references: [id])
+}
+
+model Coefficient {
+  id                String   @id @default(uuid())
+  type_action       String   // Conception or MAJ
+  niveau_complexite String   // N1, N2, N3
+  valeur            Float
+  description       String?
+}
+

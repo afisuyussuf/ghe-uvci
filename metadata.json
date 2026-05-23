@@ -1,0 +1,6 @@
+{
+  "name": "GHE UVCI",
+  "description": "Gestion des Heures Enseignants - Université Virtuelle de Côte d'Ivoire. Plateforme complète de suivi et calcul automatisé des charges pédagogiques.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

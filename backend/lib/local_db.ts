@@ -1,0 +1,149 @@
+import fs from "fs";
+import path from "path";
+
+const FILE_PATH = path.join(process.cwd(), "backend", "lib", "local_data.json");
+
+export interface LocalDataSchema {
+  users: any[];
+  departements: any[];
+  filieres: any[];
+  niveaux: any[];
+  annees: any[];
+  coefficients: any[];
+  cours: any[];
+  activites: any[];
+  paiements: any[];
+  etats: any[];
+  documents: any[];
+  disponibilites: any[];
+  semestres: any[];
+  auditLogs: any[];
+  notifications?: any[];
+}
+
+const defaultData: LocalDataSchema = {
+  users: [
+    {
+      id: "test-admin",
+      email: "admin@uvci.edu.ci",
+      password: "demo123",
+      nom: "AFISU",
+      prenom: "Yussuf",
+      role: "admin",
+      actif: true,
+      grade: "Professeur Titulaire",
+      taux_horaire: 25000,
+      id_departement: "dept-1",
+      id_contrat: "c1",
+      photo_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=AFISU"
+    },
+    {
+      id: "test-secretaire",
+      email: "safi.moustapha@uvci.edu.ci",
+      password: "demo123",
+      nom: "MOUSTAPHA",
+      prenom: "Safi",
+      role: "secretaire",
+      actif: true,
+      id_departement: "dept-2",
+      id_contrat: "c1",
+      photo_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=MOUSTAPHA"
+    },
+    {
+      id: "test-enseignant",
+      email: "kouassi.jean@uvci.edu.ci",
+      password: "demo123",
+      nom: "KOUASSI",
+      prenom: "Jean",
+      role: "enseignant",
+      actif: true,
+      grade: "Maître-Assistant",
+      taux_horaire: 15000,
+      id_departement: "dept-1",
+      id_contrat: "c2",
+      photo_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=KOUASSI"
+    }
+  ],
+  departements: [
+    { id: "dept-1", libelle: "Informatique et Sciences du Numérique", code: "ISN" },
+    { id: "dept-2", libelle: "Ressources Humaines et Administration", code: "RHA" },
+    { id: "dept-3", libelle: "Langues et Sciences Sociales", code: "LSS" }
+  ],
+  filieres: [
+    { id: "f1", libelle: "Spécialité Informatique", code: "ISN", description: "Développement d'application et systèmes" },
+    { id: "f2", libelle: "Génie Logiciel", code: "GL", description: "Conception et génie logiciel" }
+  ],
+  niveaux: [
+    { id: "n1", libelle: "Licence 1 (L1)" },
+    { id: "n2", libelle: "Licence 2 (L2)" },
+    { id: "n3", libelle: "Master 1 (M1)" }
+  ],
+  annees: [
+    { id: "ann-1", libelle: "2024-2025", date_debut: "2024-10-01", date_fin: "2025-07-31", actif: false },
+    { id: "ann-2", libelle: "2025-2026", date_debut: "2025-09-01", date_fin: "2026-06-30", actif: true }
+  ],
+  coefficients: [
+    { id: "c-1", type_action: "Conception", niveau_complexite: "N1", valeur: 1.5, description: "Conception standard" },
+    { id: "c-2", type_action: "Conception", niveau_complexite: "N2", valeur: 2.0, description: "Conception moyenne" },
+    { id: "c-3", type_action: "Conception", niveau_complexite: "N3", valeur: 2.5, description: "Conception complexe" },
+    { id: "c-4", type_action: "MAJ", niveau_complexite: "N1", valeur: 0.5, description: "Mise à jour mineure" },
+    { id: "c-5", type_action: "MAJ", niveau_complexite: "N2", valeur: 0.8, description: "Mise à jour moyenne" },
+    { id: "c-6", type_action: "MAJ", niveau_complexite: "N3", valeur: 1.2, description: "Mise à jour majeure" }
+  ],
+  cours: [
+    { id: "cr-1", intitule: "Algorithmique Programmée", code_cours: "ALG101", nb_heures: 20, nb_sequences: 80, id_filiere: "f1", id_niveau: "n1", id_semestre: "sem1", id_annee_academique: "ann-2", id_enseignant: "test-enseignant" },
+    { id: "cr-2", intitule: "Bases de Données Relationnelles", code_cours: "DB202", nb_heures: 30, nb_sequences: 120, id_filiere: "f1", id_niveau: "n2", id_semestre: "sem2", id_annee_academique: "ann-2", id_enseignant: "test-enseignant" }
+  ],
+  activites: [],
+  paiements: [],
+  etats: [],
+  documents: [
+    { id: "doc-1", id_user: "test-enseignant", nom: "Contrat Signé UVCI 2025", type: "Contrat", file_url: "/uploads/contrat-sample.pdf", date_upload: "2025-09-01" }
+  ],
+  disponibilites: [],
+  semestres: [
+    { id: 'sem1', libelle: 'Semestre 1' },
+    { id: 'sem2', libelle: 'Semestre 2' }
+  ],
+  auditLogs: [],
+  notifications: []
+};
+
+export function loadLocalData(): LocalDataSchema {
+  try {
+    if (!fs.existsSync(FILE_PATH)) {
+      saveLocalData(defaultData);
+      return defaultData;
+    }
+    const content = fs.readFileSync(FILE_PATH, "utf-8");
+    const parsed = JSON.parse(content);
+    if (!parsed.semestres) {
+      parsed.semestres = [
+        { id: 'sem1', libelle: 'Semestre 1' },
+         { id: 'sem2', libelle: 'Semestre 2' }
+      ];
+    }
+    if (!parsed.auditLogs) {
+      parsed.auditLogs = [];
+    }
+    if (!parsed.notifications) {
+      parsed.notifications = [];
+    }
+    return parsed;
+  } catch (e) {
+    console.error("Failed to read local data. Resetting...", e);
+    return defaultData;
+  }
+}
+
+export function saveLocalData(data: LocalDataSchema) {
+  try {
+    const dir = path.dirname(FILE_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(FILE_PATH, JSON.stringify(data, null, 2), "utf-8");
+  } catch (e) {
+    console.error("Failed to save local data:", e);
+  }
+}
