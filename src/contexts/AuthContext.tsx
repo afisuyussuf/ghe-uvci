@@ -82,12 +82,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (response.ok) {
-      const data = await response.json();
-      saveUserSessionForStorage(data);
-      setUser(data);
-      setProfile(data);
-      logAction('LOGIN', `Connexion de l'utilisateur ${data.prenom} ${data.nom} (${data.role})`);
-      return data;
+      const { token, user: userData } = await response.json();
+      localStorage.setItem('ghe_token', token);
+      saveUserSessionForStorage(userData);
+      setUser(userData);
+      setProfile(userData);
+      logAction('LOGIN', `Connexion de l'utilisateur ${userData.prenom} ${userData.nom} (${userData.role})`);
+      return userData;
     } else {
       const errorData = await response.json();
       throw new Error(errorData.error || 'Erreur de connexion');
@@ -105,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error(e);
     }
     localStorage.removeItem('ghe_user');
+    localStorage.removeItem('ghe_token');
     setUser(null);
     setProfile(null);
   };

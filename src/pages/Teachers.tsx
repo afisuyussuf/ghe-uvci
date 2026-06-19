@@ -194,10 +194,13 @@ export default function Teachers() {
     try {
       const pdfDoc = new jsPDF();
       
+      // Add Logo
+      await addLogoToDoc(pdfDoc, 14, 8, 15, 15);
+      
       // Header
-      pdfDoc.setFontSize(22);
+      pdfDoc.setFontSize(20);
       pdfDoc.setTextColor(106, 27, 154);
-      pdfDoc.text('FICHE INDIVIDUELLE ENSEIGNANT', 105, 20, { align: 'center' });
+      pdfDoc.text('FICHE INDIVIDUELLE ENSEIGNANT', 105, 18, { align: 'center' });
       
       pdfDoc.setDrawColor(106, 27, 154);
       pdfDoc.setLineWidth(0.5);

@@ -3,6 +3,7 @@ import { getPrisma } from "../db";
 import { calculateVolumeHoraire } from "../lib/calculations";
 import { loadLocalData, saveLocalData } from "../lib/local_db";
 import { notifyUser, notifySecretaires, notifyAdmins } from "../lib/notifications";
+import { logAction } from "../lib/audit";
 
 const router = Router();
 
@@ -101,6 +102,11 @@ router.post("/", async (req, res) => {
       type: "info",
     }).catch(e => console.error("[activities POST] notify error:", e));
 
+    const creator = (req as any).user;
+    if (creator) {
+      logAction(req, "CREATE_ACTIVITY", creator.id, creator.email, `Création d'une activité (${type_action}) de volume ${volume_horaire}h pour "${crs?.intitule || 'Cours inconnu'}"`).catch(console.error);
+    }
+
     return res.status(201).json(enriched);
   }
 
@@ -131,6 +137,11 @@ router.post("/", async (req, res) => {
       message: `${usr?.prenom || ''} ${usr?.nom || ''} a créé une activité (${type_action}) pour "${crs?.intitule || 'Cours inconnu'}".`,
       type: "info",
     }).catch(e => console.error("[activities POST] notify error:", e));
+
+    const creator = (req as any).user;
+    if (creator) {
+      logAction(req, "CREATE_ACTIVITY", creator.id, creator.email, `Création d'une activité (${type_action}) de volume ${volume_horaire}h pour "${crs?.intitule || 'Cours inconnu'}"`).catch(console.error);
+    }
 
     res.json(activity);
   } catch (error) {
@@ -206,6 +217,16 @@ router.put("/:id", async (req, res) => {
             type: "error",
           }).catch(e => console.error("[activities PUT local] notify teacher error:", e));
         }
+      // 🔔 Audit Log
+      const updater = (req as any).user;
+      if (updater) {
+        let logText = `Modification de l'activité ID: ${id} pour "${crs?.intitule || 'Cours inconnu'}"`;
+        if (statut && statut !== prevStatut) {
+          if (statut === 'soumise') logText = `Soumission de l'activité ID: ${id} (${finalType}) pour "${crs?.intitule || 'Cours inconnu'}"`;
+          else if (statut === 'valide') logText = `Validation de l'activité ID: ${id} (${finalType}) pour "${crs?.intitule || 'Cours inconnu'}"`;
+          else if (statut === 'rejete') logText = `Rejet de l'activité ID: ${id} (${finalType}) pour "${crs?.intitule || 'Cours inconnu'}" (Motif: ${req.body.motif_rejet || 'non précisé'})`;
+        }
+        logAction(req, statut === 'valide' ? "VALIDATE_ACTIVITY" : statut === 'rejete' ? "REJECT_ACTIVITY" : "UPDATE_ACTIVITY", updater.id, updater.email, logText).catch(console.error);
       }
 
       return res.json(enriched);
@@ -282,6 +303,18 @@ router.put("/:id", async (req, res) => {
       }
     }
 
+    // 🔔 Audit Log
+    const updater = (req as any).user;
+    if (updater) {
+      let logText = `Modification de l'activité ID: ${id} pour "${crs?.intitule || 'Cours inconnu'}"`;
+      if (statut && statut !== prevStatut) {
+        if (statut === 'soumise') logText = `Soumission de l'activité ID: ${id} (${activity.type_action}) pour "${crs?.intitule || 'Cours inconnu'}"`;
+        else if (statut === 'valide') logText = `Validation de l'activité ID: ${id} (${activity.type_action}) pour "${crs?.intitule || 'Cours inconnu'}"`;
+        else if (statut === 'rejete') logText = `Rejet de l'activité ID: ${id} (${activity.type_action}) pour "${crs?.intitule || 'Cours inconnu'}" (Motif: ${updateData.motif_rejet || 'non précisé'})`;
+      }
+      logAction(req, statut === 'valide' ? "VALIDATE_ACTIVITY" : statut === 'rejete' ? "REJECT_ACTIVITY" : "UPDATE_ACTIVITY", updater.id, updater.email, logText).catch(console.error);
+    }
+
     res.json(activity);
   } catch (error) {
     console.error(error);
@@ -299,6 +332,12 @@ router.delete("/:id", async (req, res) => {
     if (filtered.length !== data.activites.length) {
       data.activites = filtered;
       saveLocalData(data);
+
+      const deleter = (req as any).user;
+      if (deleter) {
+        logAction(req, "DELETE_ACTIVITY", deleter.id, deleter.email, `Suppression de l'activité ID: ${id}`).catch(console.error);
+      }
+
       return res.json({ message: "Deleted" });
     }
     return res.status(404).json({ error: "Activity not found" });
@@ -306,6 +345,12 @@ router.delete("/:id", async (req, res) => {
 
   try {
     await prisma.activite.delete({ where: { id } });
+
+    const deleter = (req as any).user;
+    if (deleter) {
+      logAction(req, "DELETE_ACTIVITY", deleter.id, deleter.email, `Suppression de l'activité ID: ${id}`).catch(console.error);
+    }
+
     res.json({ message: "Deleted" });
   } catch (error) {
     res.status(500).json({ error: "Failed to delete activity" });

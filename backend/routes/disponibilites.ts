@@ -2,6 +2,7 @@ import express from "express";
 import { getPrisma } from "../db";
 import { loadLocalData, saveLocalData } from "../lib/local_db";
 import { notifySecretaires, notifyAdmins } from "../lib/notifications";
+import { logAction } from "../lib/audit";
 
 const router = express.Router();
 
@@ -146,6 +147,12 @@ router.post("/", async (req, res) => {
         notifyAdmins(notifPayload),
       ]);
 
+      // 🔔 Audit Log
+      const updater = (req as any).user;
+      if (updater) {
+        logAction(req, "UPDATE_AVAILABILITY", updater.id, updater.email, `Mise à jour des disponibilités (${count} créneaux) pour ${name}`).catch(console.error);
+      }
+
       return res.json({ message: "Availability updated" });
     } catch (e) {
       console.error(e);
@@ -180,6 +187,12 @@ router.post("/", async (req, res) => {
       notifySecretaires(notifPayload),
       notifyAdmins(notifPayload),
     ]).catch(e => console.error("[disponibilites] notify error:", e));
+
+    // 🔔 Audit Log
+    const updater = (req as any).user;
+    if (updater) {
+      logAction(req, "UPDATE_AVAILABILITY", updater.id, updater.email, `Mise à jour des disponibilités (${count} créneaux) pour ${name}`).catch(console.error);
+    }
 
     res.json({ message: "Availability updated" });
   } catch (error) {

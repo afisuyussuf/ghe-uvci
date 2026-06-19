@@ -2,6 +2,7 @@ import { Router } from "express";
 import { getPrisma } from "../db";
 import { loadLocalData, saveLocalData } from "../lib/local_db";
 import bcrypt from "bcryptjs";
+import { logAction } from "../lib/audit";
 
 const router = Router();
 
@@ -95,11 +96,23 @@ router.post("/", async (req, res) => {
     };
     data.users.push(newUser);
     saveLocalData(data);
+
+    const creator = (req as any).user;
+    if (creator) {
+      logAction(req, "CREATE_USER", creator.id, creator.email, `Création de l'utilisateur ${bodyData.prenom} ${bodyData.nom} (${bodyData.email}) avec rôle: ${bodyData.role}`).catch(console.error);
+    }
+
     return res.status(201).json(newUser);
   }
 
   try {
     const user = await prisma.user.create({ data: bodyData });
+
+    const creator = (req as any).user;
+    if (creator) {
+      logAction(req, "CREATE_USER", creator.id, creator.email, `Création de l'utilisateur ${bodyData.prenom} ${bodyData.nom} (${bodyData.email}) avec rôle: ${bodyData.role}`).catch(console.error);
+    }
+
     res.status(201).json(user);
   } catch (err) {
     console.error("user creation error in Postgres. Falling back to local file...", err);
@@ -113,6 +126,12 @@ router.post("/", async (req, res) => {
     };
     data.users.push(newUser);
     saveLocalData(data);
+
+    const creator = (req as any).user;
+    if (creator) {
+      logAction(req, "CREATE_USER", creator.id, creator.email, `Création de l'utilisateur ${bodyData.prenom} ${bodyData.nom} (${bodyData.email}) avec rôle: ${bodyData.role}`).catch(console.error);
+    }
+
     res.status(201).json(newUser);
   }
 });
@@ -140,6 +159,12 @@ router.put("/:id", async (req, res) => {
         updated_at: new Date().toISOString()
       };
       saveLocalData(data);
+
+      const updater = (req as any).user;
+      if (updater) {
+        logAction(req, "UPDATE_USER", updater.id, updater.email, `Mise à jour de l'utilisateur (ID: ${id})`).catch(console.error);
+      }
+
       return res.json(data.users[index]);
     }
     return res.status(404).json({ error: "User not found" });
@@ -147,6 +172,12 @@ router.put("/:id", async (req, res) => {
 
   try {
     const user = await prisma.user.update({ where: { id }, data: updateData });
+
+    const updater = (req as any).user;
+    if (updater) {
+      logAction(req, "UPDATE_USER", updater.id, updater.email, `Mise à jour de l'utilisateur ${user.prenom || ''} ${user.nom || ''} (ID: ${id})`).catch(console.error);
+    }
+
     res.json(user);
   } catch (err) {
     console.error("user update error in Postgres. Falling back to local file...", err);
@@ -159,6 +190,12 @@ router.put("/:id", async (req, res) => {
         updated_at: new Date().toISOString()
       };
       saveLocalData(data);
+
+      const updater = (req as any).user;
+      if (updater) {
+        logAction(req, "UPDATE_USER", updater.id, updater.email, `Mise à jour de l'utilisateur (ID: ${id})`).catch(console.error);
+      }
+
       return res.json(data.users[index]);
     }
     res.status(404).json({ error: "User not found" });
@@ -175,6 +212,12 @@ router.delete("/:id", async (req, res) => {
     if (filtered.length !== data.users.length) {
       data.users = filtered;
       saveLocalData(data);
+
+      const deleter = (req as any).user;
+      if (deleter) {
+        logAction(req, "DELETE_USER", deleter.id, deleter.email, `Suppression de l'utilisateur ID: ${id}`).catch(console.error);
+      }
+
       return res.json({ message: "Deleted" });
     }
     return res.status(404).json({ error: "User not found" });
@@ -182,6 +225,12 @@ router.delete("/:id", async (req, res) => {
 
   try {
     await prisma.user.delete({ where: { id } });
+
+    const deleter = (req as any).user;
+    if (deleter) {
+      logAction(req, "DELETE_USER", deleter.id, deleter.email, `Suppression de l'utilisateur ID: ${id}`).catch(console.error);
+    }
+
     res.json({ message: "Deleted" });
   } catch (err) {
     console.error("user deletion error in Postgres. Falling back to local file...", err);
@@ -190,6 +239,12 @@ router.delete("/:id", async (req, res) => {
     if (filtered.length !== data.users.length) {
       data.users = filtered;
       saveLocalData(data);
+
+      const deleter = (req as any).user;
+      if (deleter) {
+        logAction(req, "DELETE_USER", deleter.id, deleter.email, `Suppression de l'utilisateur ID: ${id}`).catch(console.error);
+      }
+
       return res.json({ message: "Deleted" });
     }
     res.status(404).json({ error: "User not found" });

@@ -15,6 +15,7 @@ import documentRoutes from "./routes/documents";
 import availabilityRoutes from "./routes/disponibilites";
 import { getPrisma } from "./db";
 import { loadLocalData, saveLocalData } from "./lib/local_db";
+import { verifyToken } from "./middleware/auth";
 
 const app = express();
 
@@ -64,17 +65,17 @@ app.use(express.urlencoded({ limit: '100mb', extended: true }));
 const router = express.Router();
 
 router.use("/auth", authRoutes);
-router.use("/users", userRoutes);
-router.use("/activities", activityRoutes);
-router.use("/courses", courseRoutes);
-router.use("/audit", auditRoutes);
-router.use("/etats_heures", etatRoutes);
-router.use("/paiements", paiementRoutes);
-router.use("/notifications", notificationRoutes);
-router.use("/stats", statsRoutes);
-router.use("/documents", documentRoutes);
-router.use("/disponibilites", availabilityRoutes);
-router.use("/", settingRoutes);
+router.use("/users", verifyToken, userRoutes);
+router.use("/activities", verifyToken, activityRoutes);
+router.use("/courses", verifyToken, courseRoutes);
+router.use("/audit", verifyToken, auditRoutes);
+router.use("/etats_heures", verifyToken, etatRoutes);
+router.use("/paiements", verifyToken, paiementRoutes);
+router.use("/notifications", verifyToken, notificationRoutes);
+router.use("/stats", verifyToken, statsRoutes);
+router.use("/documents", verifyToken, documentRoutes);
+router.use("/disponibilites", verifyToken, availabilityRoutes);
+router.use("/", verifyToken, settingRoutes);
 
 const PERMISSIONS_FILE = path.join(process.cwd(), "backend", "lib", "permissions.json");
 

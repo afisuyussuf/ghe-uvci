@@ -48,6 +48,7 @@ export default function HistoryPage() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterAction, setFilterAction] = useState('');
+  const [filterRole, setFilterRole] = useState('');
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -125,7 +126,12 @@ export default function HistoryPage() {
       (log.device || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (log.ip_address || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchFilter = filterAction ? log.action === filterAction : true;
-    return matchSearch && matchFilter;
+
+    const userObj = users.find(u => u.id === log.userId || u.email === log.userEmail);
+    const role = userObj ? userObj.role : (log.userEmail === 'admin' || log.userId === 'admin' ? 'admin' : 'Systeme');
+    const matchRole = filterRole ? role.toLowerCase() === filterRole.toLowerCase() : true;
+
+    return matchSearch && matchFilter && matchRole;
   });
 
   const totalItems = filteredLogs.length;
@@ -150,29 +156,41 @@ export default function HistoryPage() {
     doc.text('Journal d\'activités', 35, 18);
     
     autoTable(doc, {
-      head: [['Date', 'Action', 'Utilisateur', 'Appareil', 'IP', 'Détails']],
-      body: filteredLogs.map(l => [
-        format(new Date(l.timestamp), 'dd/MM/yyyy HH:mm', { locale: fr }),
-        l.action,
-        l.userEmail || l.userId,
-        l.device || '—',
-        l.ip_address || '—',
-        l.details
-      ]),
+      head: [['Date', 'Action', 'Utilisateur', 'Profil', 'Appareil', 'IP', 'Détails']],
+      body: filteredLogs.map(l => {
+        const userObj = users.find(u => u.id === l.userId || u.email === l.userEmail);
+        const role = userObj ? userObj.role : (l.userEmail === 'admin' || l.userId === 'admin' ? 'admin' : 'Systeme');
+        const roleLabel = role === 'admin' ? 'Admin' : role === 'secretaire' ? 'Secrétaire' : role === 'enseignant' ? 'Enseignant' : 'Système';
+        return [
+          format(new Date(l.timestamp), 'dd/MM/yyyy HH:mm', { locale: fr }),
+          l.action,
+          l.userEmail || l.userId,
+          roleLabel,
+          l.device || '—',
+          l.ip_address || '—',
+          l.details
+        ];
+      }),
       startY: 30
     });
     doc.save('historique.pdf');
   };
 
   const exportExcel = () => {
-    const exportData = filteredLogs.map(l => ({
-      Date: format(new Date(l.timestamp), 'dd/MM/yyyy HH:mm', { locale: fr }),
-      Action: l.action,
-      Utilisateur: l.userEmail || l.userId,
-      Appareil: l.device || '—',
-      IP: l.ip_address || '—',
-      Détails: l.details
-    }));
+    const exportData = filteredLogs.map(l => {
+      const userObj = users.find(u => u.id === l.userId || u.email === l.userEmail);
+      const role = userObj ? userObj.role : (l.userEmail === 'admin' || l.userId === 'admin' ? 'admin' : 'Systeme');
+      const roleLabel = role === 'admin' ? 'Admin' : role === 'secretaire' ? 'Secrétaire' : role === 'enseignant' ? 'Enseignant' : 'Système';
+      return {
+        Date: format(new Date(l.timestamp), 'dd/MM/yyyy HH:mm', { locale: fr }),
+        Action: l.action,
+        Utilisateur: l.userEmail || l.userId,
+        Profil: roleLabel,
+        Appareil: l.device || '—',
+        IP: l.ip_address || '—',
+        Détails: l.details
+      };
+    });
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "History");
@@ -275,6 +293,17 @@ export default function HistoryPage() {
               <option key={a} value={a}>{a}</option>
             ))}
           </select>
+          <select
+            value={filterRole}
+            onChange={(e) => { setFilterRole(e.target.value); setCurrentPage(1); }}
+            className="py-3 px-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-uvci-purple text-sm text-black"
+          >
+            <option value="">Tous les profils</option>
+            <option value="admin">Administrateur</option>
+            <option value="secretaire">Secrétaire</option>
+            <option value="enseignant">Enseignant</option>
+            <option value="Systeme">Système</option>
+          </select>
         </div>
         <p className="text-xs text-slate-400">{filteredLogs.length} résultat(s) trouvé(s)</p>
       </div>
@@ -287,6 +316,7 @@ export default function HistoryPage() {
                 <th className="p-6">Date</th>
                 <th>Action</th>
                 <th>Utilisateur</th>
+                <th>Profil</th>
                 <th>Appareil</th>
                 <th>Adresse IP</th>
                 <th>Détails</th>
@@ -309,6 +339,16 @@ export default function HistoryPage() {
                       <User size={14} className="text-slate-400" />
                       {log.userEmail || 'Système'}
                     </div>
+                  </td>
+                  <td>
+                    {(() => {
+                      const userObj = users.find(u => u.id === log.userId || u.email === log.userEmail);
+                      const role = userObj ? userObj.role : (log.userEmail === 'admin' || log.userId === 'admin' ? 'admin' : 'Systeme');
+                      if (role === 'admin') return <span className="badge badge-error badge-sm text-white font-bold">Admin</span>;
+                      if (role === 'secretaire') return <span className="badge badge-warning badge-sm text-white font-bold">Secrétaire</span>;
+                      if (role === 'enseignant') return <span className="badge badge-info badge-sm text-white font-bold">Enseignant</span>;
+                      return <span className="badge badge-ghost badge-sm font-bold text-slate-400">Système</span>;
+                    })()}
                   </td>
                   <td className="text-sm">
                     <div className="flex items-center gap-2 text-slate-600 whitespace-nowrap">

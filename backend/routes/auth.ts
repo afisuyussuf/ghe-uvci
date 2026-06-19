@@ -2,8 +2,10 @@ import { Router } from "express";
 import { getPrisma } from "../db";
 import { loadLocalData, saveLocalData } from "../lib/local_db";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 
 const router = Router();
+const JWT_SECRET = process.env.JWT_SECRET || "ghe_uvci_super_secret_key_2026_xyz";
 
 // Helper to detect device type from User-Agent string
 function detectDevice(userAgent: string): string {
@@ -92,7 +94,8 @@ router.post("/login", async (req, res) => {
         }
         await createAuditLog(user.id, user.email);
         const { password: _, ...userWithoutPassword } = user;
-        return res.json(userWithoutPassword);
+        const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
+        return res.json({ token, user: userWithoutPassword });
       }
     } catch (error) {
       console.error("Database login failed, running file fallback...", error);
@@ -110,7 +113,8 @@ router.post("/login", async (req, res) => {
     }
     await createAuditLog(dbUser.id, dbUser.email);
     const { password: _, ...userWithoutPassword } = dbUser;
-    return res.json(userWithoutPassword);
+    const token = jwt.sign({ id: dbUser.id, email: dbUser.email, role: dbUser.role }, JWT_SECRET, { expiresIn: '24h' });
+    return res.json({ token, user: userWithoutPassword });
   }
 
   // Static fallback accounts (dev only)
@@ -124,7 +128,8 @@ router.post("/login", async (req, res) => {
   if (staticUser && staticUser.password === password) {
     await createAuditLog(staticUser.id, staticUser.email);
     const { password: _, ...userWithoutPassword } = staticUser;
-    return res.json(userWithoutPassword);
+    const token = jwt.sign({ id: staticUser.id, email: staticUser.email, role: staticUser.role }, JWT_SECRET, { expiresIn: '24h' });
+    return res.json({ token, user: userWithoutPassword });
   }
 
   res.status(401).json({ error: "E-mail ou mot de passe incorrect." });
