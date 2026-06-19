@@ -1,0 +1,19 @@
+{
+  "secretaire": [
+    "/",
+    "/enseignants",
+    "/cours",
+    "/activites",
+    "/etats",
+    "/paiements",
+    "/profil"
+  ],
+  "enseignant": [
+    "/",
+    "/activites",
+    "/etats",
+    "/paiements",
+    "/profil",
+    "/disponibilites"
+  ]
+}
