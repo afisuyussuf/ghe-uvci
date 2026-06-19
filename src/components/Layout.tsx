@@ -106,7 +106,7 @@ export default function Layout() {
     };
 
     fetchNotifs();
-    const interval = setInterval(fetchNotifs, 30000); // Poll every 30s as a simple real-time replacement
+    const interval = setInterval(fetchNotifs, 15000); // Poll every 15s
     return () => clearInterval(interval);
   }, [profile?.id]);
 
@@ -265,7 +265,9 @@ export default function Layout() {
               >
                 <Bell size={24} />
                 {notifications.filter(n => !n.lu).length > 0 && (
-                  <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white px-0.5 animate-pulse">
+                    {notifications.filter(n => !n.lu).length > 9 ? '9+' : notifications.filter(n => !n.lu).length}
+                  </span>
                 )}
               </button>
 

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { getPrisma } from "../db";
 import { calculateVolumeHoraire } from "../lib/calculations";
 import { loadLocalData, saveLocalData } from "../lib/local_db";
+import { notifyUser, notifySecretaires, notifyAdmins } from "../lib/notifications";
 
 const router = Router();
 
@@ -32,10 +33,10 @@ router.get("/", async (req, res) => {
     const data = loadLocalData();
     let list = data.activites;
     if (userId) {
-      list = list.filter(a => a.id_user === String(userId));
+      list = list.filter((a: any) => a.id_user === String(userId));
     }
     // Return in descending order of creation
-    const sorted = [...list].sort((a,b) => new Date(b.date_saisie).getTime() - new Date(a.date_saisie).getTime());
+    const sorted = [...list].sort((a: any, b: any) => new Date(b.date_saisie).getTime() - new Date(a.date_saisie).getTime());
     return res.json(enrichActivities(sorted, data));
   }
 
@@ -56,9 +57,9 @@ router.get("/", async (req, res) => {
     const data = loadLocalData();
     let list = data.activites;
     if (userId) {
-      list = list.filter(a => a.id_user === String(userId));
+      list = list.filter((a: any) => a.id_user === String(userId));
     }
-    const sorted = [...list].sort((a,b) => new Date(b.date_saisie).getTime() - new Date(a.date_saisie).getTime());
+    const sorted = [...list].sort((a: any, b: any) => new Date(b.date_saisie).getTime() - new Date(a.date_saisie).getTime());
     res.json(enrichActivities(sorted, data));
   }
 });
@@ -72,7 +73,7 @@ router.post("/", async (req, res) => {
 
   if (!prisma) {
     const data = loadLocalData();
-    const user = data.users.find(u => u.id === id_user);
+    const user = data.users.find((u: any) => u.id === id_user);
     const taux = user?.taux_horaire || 15000;
     const montant = volume_horaire * taux;
 
@@ -88,7 +89,19 @@ router.post("/", async (req, res) => {
 
     data.activites.push(newActivity);
     saveLocalData(data);
-    return res.status(201).json(enrichActivities([newActivity], data)[0]);
+
+    const enriched = enrichActivities([newActivity], data)[0];
+    const crs = enriched.cours;
+    const usr = enriched.user;
+
+    // 🔔 Notify secretaries: new activity created
+    notifySecretaires({
+      titre: "📝 Nouvelle activité créée",
+      message: `${usr.prenom} ${usr.nom} a créé une activité (${type_action}) pour "${crs?.intitule || 'Cours inconnu'}".`,
+      type: "info",
+    }).catch(e => console.error("[activities POST] notify error:", e));
+
+    return res.status(201).json(enriched);
   }
 
   let montant = req.body.montant;
@@ -103,8 +116,22 @@ router.post("/", async (req, res) => {
         ...req.body,
         volume_horaire,
         montant
-      } 
+      },
+      include: {
+        cours: true,
+        user: { select: { nom: true, prenom: true, id: true, photo_url: true, role: true, taux_horaire: true } }
+      }
     });
+
+    // 🔔 Notify secretaries: new activity created
+    const crs = (activity as any).cours;
+    const usr = (activity as any).user;
+    notifySecretaires({
+      titre: "📝 Nouvelle activité créée",
+      message: `${usr?.prenom || ''} ${usr?.nom || ''} a créé une activité (${type_action}) pour "${crs?.intitule || 'Cours inconnu'}".`,
+      type: "info",
+    }).catch(e => console.error("[activities POST] notify error:", e));
+
     res.json(activity);
   } catch (error) {
     console.error(error);
@@ -119,15 +146,16 @@ router.put("/:id", async (req, res) => {
 
   if (!prisma) {
     const data = loadLocalData();
-    const index = data.activites.findIndex(a => a.id === id);
+    const index = data.activites.findIndex((a: any) => a.id === id);
     if (index !== -1) {
       const current = data.activites[index];
+      const prevStatut = current.statut;
       const finalType = type_action || current.type_action;
       const finalNiveau = niveau_complexite || current.niveau_complexite;
       const finalSeqs = nb_sequences === undefined ? current.nb_sequences : nb_sequences;
       const volume_horaire = calculateVolumeHoraire(finalType, finalNiveau, finalSeqs);
       
-      const user = data.users.find(u => u.id === current.id_user);
+      const user = data.users.find((u: any) => u.id === current.id_user);
       const taux = user?.taux_horaire || 15000;
       const montant = volume_horaire * taux;
 
@@ -140,13 +168,54 @@ router.put("/:id", async (req, res) => {
 
       data.activites[index] = updated;
       saveLocalData(data);
-      return res.json(enrichActivities([updated], data)[0]);
+
+      const enriched = enrichActivities([updated], data)[0];
+      const crs = enriched.cours;
+      const usr = enriched.user;
+
+      // 🔔 Notifications based on status change
+      if (statut && statut !== prevStatut) {
+        if (statut === 'soumise') {
+          // Teacher submitted → notify secretaries + admins
+          Promise.all([
+            notifySecretaires({
+              titre: "📨 Activité soumise pour validation",
+              message: `${usr?.prenom || ''} ${usr?.nom || ''} a soumis une activité (${finalType}) pour "${crs?.intitule || 'Cours inconnu'}" en attente de validation.`,
+              type: "warning",
+            }),
+            notifyAdmins({
+              titre: "📨 Activité soumise pour validation",
+              message: `${usr?.prenom || ''} ${usr?.nom || ''} a soumis une activité (${finalType}) pour "${crs?.intitule || 'Cours inconnu'}".`,
+              type: "warning",
+            }),
+          ]).catch(e => console.error("[activities PUT local] notify error:", e));
+        } else if (statut === 'valide') {
+          // Secretary validated → notify the teacher
+          notifyUser({
+            id_utilisateur: current.id_user,
+            titre: "✅ Activité validée",
+            message: `Votre activité (${finalType}) pour "${crs?.intitule || 'Cours inconnu'}" a été validée avec succès.`,
+            type: "success",
+          }).catch(e => console.error("[activities PUT local] notify teacher error:", e));
+        } else if (statut === 'rejete') {
+          // Secretary rejected → notify the teacher
+          notifyUser({
+            id_utilisateur: current.id_user,
+            titre: "❌ Activité rejetée",
+            message: `Votre activité (${finalType}) pour "${crs?.intitule || 'Cours inconnu'}" a été rejetée. Motif : ${req.body.motif_rejet || 'Non précisé'}.`,
+            type: "error",
+          }).catch(e => console.error("[activities PUT local] notify teacher error:", e));
+        }
+      }
+
+      return res.json(enriched);
     }
     return res.status(404).json({ error: "Activity not found" });
   }
 
   let updateData = { ...req.body };
 
+  // Recalculate volume_horaire if fields changed
   if (type_action || niveau_complexite || nb_sequences) {
     try {
       const currentActivity = await prisma.activite.findUnique({ where: { id } }) as any;
@@ -159,32 +228,63 @@ router.put("/:id", async (req, res) => {
   }
 
   try {
+    // Get current activity state before update (to detect status change)
+    const currentActivity = await prisma.activite.findUnique({ 
+      where: { id },
+      include: { user: true, cours: true }
+    }) as any;
+    const prevStatut = currentActivity?.statut;
+
     const activity = await prisma.activite.update({ 
       where: { id }, 
       data: updateData,
-      include: { user: true, cours: true }
-    });
+      include: { 
+        user: { select: { nom: true, prenom: true, id: true, photo_url: true, role: true, taux_horaire: true } },
+        cours: true 
+      }
+    }) as any;
 
-    if (statut && (statut === 'valide' || statut === 'rejete' || statut === 'soumise')) {
-      const courseLabel = activity.cours?.intitule || 'Inconnu';
-      try {
-        await (prisma as any).notification.create({
-          data: {
-            id_utilisateur: activity.id_user,
-            titre: `Activité ${statut === 'valide' ? 'Validée' : statut === 'soumise' ? 'Soumise' : 'Rejetée'}`,
-            message: statut === 'valide' 
-              ? `Votre activité (${activity.type_action}) pour "${courseLabel}" a été validée.` 
-              : statut === 'rejete' 
-                ? `Votre activité pour "${courseLabel}" a été rejetée. Motif: ${updateData.motif_rejet || 'Non spécifié'}`
-                : `Une nouvelle activité de ${activity.user.nom} pour "${courseLabel}" est en attente de validation.`,
-            type: statut === 'valide' ? 'success' : statut === 'rejete' ? 'error' : 'info',
-          }
-        });
-      } catch (e) {}
+    const crs = activity.cours;
+    const usr = activity.user;
+
+    // 🔔 Notifications based on status change
+    if (statut && statut !== prevStatut) {
+      if (statut === 'soumise') {
+        // Teacher submitted → notify secretaries + admins
+        Promise.all([
+          notifySecretaires({
+            titre: "📨 Activité soumise pour validation",
+            message: `${usr?.prenom || ''} ${usr?.nom || ''} a soumis une activité (${activity.type_action}) pour "${crs?.intitule || 'Cours inconnu'}" en attente de validation.`,
+            type: "warning",
+          }),
+          notifyAdmins({
+            titre: "📨 Activité soumise pour validation",
+            message: `${usr?.prenom || ''} ${usr?.nom || ''} a soumis une activité (${activity.type_action}) pour "${crs?.intitule || 'Cours inconnu'}".`,
+            type: "warning",
+          }),
+        ]).catch(e => console.error("[activities PUT] notify error:", e));
+      } else if (statut === 'valide') {
+        // Secretary validated → notify the teacher
+        notifyUser({
+          id_utilisateur: activity.id_user,
+          titre: "✅ Activité validée",
+          message: `Votre activité (${activity.type_action}) pour "${crs?.intitule || 'Cours inconnu'}" a été validée avec succès.`,
+          type: "success",
+        }).catch(e => console.error("[activities PUT] notify teacher error:", e));
+      } else if (statut === 'rejete') {
+        // Secretary rejected → notify the teacher
+        notifyUser({
+          id_utilisateur: activity.id_user,
+          titre: "❌ Activité rejetée",
+          message: `Votre activité (${activity.type_action}) pour "${crs?.intitule || 'Cours inconnu'}" a été rejetée. Motif : ${updateData.motif_rejet || 'Non précisé'}.`,
+          type: "error",
+        }).catch(e => console.error("[activities PUT] notify teacher error:", e));
+      }
     }
 
     res.json(activity);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: "Failed to update activity" });
   }
 });
@@ -195,7 +295,7 @@ router.delete("/:id", async (req, res) => {
   
   if (!prisma) {
     const data = loadLocalData();
-    const filtered = data.activites.filter(a => a.id !== id);
+    const filtered = data.activites.filter((a: any) => a.id !== id);
     if (filtered.length !== data.activites.length) {
       data.activites = filtered;
       saveLocalData(data);

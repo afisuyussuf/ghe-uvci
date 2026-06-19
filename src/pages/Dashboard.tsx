@@ -10,7 +10,9 @@ import {
   Clock3,
   BarChart3,
   Calendar,
-  Info
+  Info,
+  ClipboardList,
+  CalendarDays
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -45,6 +47,8 @@ export default function Dashboard() {
   });
 
   const [recentActivities, setRecentActivities] = useState<ActivitePedagogique[]>([]);
+  const [pendingActivitiesList, setPendingActivitiesList] = useState<ActivitePedagogique[]>([]);
+  const [recentDisponibilites, setRecentDisponibilites] = useState<any[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [annees, setAnnees] = useState<AnneeAcademique[]>([]);
   const [departements, setDepartements] = useState<Departement[]>([]);
@@ -149,6 +153,15 @@ export default function Dashboard() {
         overloadedTeachers: overloaded 
       }));
       setRecentActivities(filtered.slice(0, 5));
+
+      // Pending activities list for secretaire/admin widget
+      if (profile?.role === 'admin' || profile?.role === 'secretaire') {
+        setPendingActivitiesList(
+          filtered
+            .filter(a => a.statut === 'en_attente' || a.statut === 'soumise')
+            .slice(0, 6)
+        );
+      }
       
       setChartData(Object.keys(monthlyData).map(key => ({
         name: key,
@@ -157,6 +170,16 @@ export default function Dashboard() {
     };
 
     fetchActivities();
+
+    // Fetch recent availability updates for admin/secretaire
+    if (profile?.role === 'admin' || profile?.role === 'secretaire') {
+      fetch('/api/disponibilites/recent')
+        .then(r => r.ok ? r.json() : [])
+        .then(data => {
+          if (Array.isArray(data)) setRecentDisponibilites(data.slice(0, 5));
+        })
+        .catch(() => {});
+    }
   }, [selectedAnneeId, selectedDeptId, users, profile]);
 
   const statCards = [
@@ -652,7 +675,126 @@ export default function Dashboard() {
             </button>
           </motion.div>
         )}
+
+        {(profile?.role === 'admin' || profile?.role === 'secretaire') && (
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.7 }}
+            className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 flex flex-col gap-4"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <CalendarDays size={20} className="text-uvci-green" />
+                Disponibilités récentes
+              </h3>
+              <button
+                onClick={() => navigate('/enseignants')}
+                className="text-xs font-bold text-uvci-purple hover:underline"
+              >
+                Voir tous
+              </button>
+            </div>
+            {recentDisponibilites.length === 0 ? (
+              <div className="text-center py-6 text-slate-400 text-sm italic">
+                Aucune mise à jour récente
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentDisponibilites.map((d: any, i: number) => (
+                  <div key={i} className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl">
+                    <div className="w-9 h-9 rounded-xl bg-uvci-green/10 text-uvci-green flex items-center justify-center shrink-0">
+                      <CalendarDays size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-800 truncate">
+                        {d.userName || 'Enseignant'}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {d.count} créneau{d.count > 1 ? 'x' : ''} • {d.date_maj ? new Date(d.date_maj).toLocaleDateString('fr-FR') : ''}
+                      </p>
+                    </div>
+                    <span className="badge badge-sm bg-uvci-green/10 text-uvci-green border-none font-bold">
+                      À jour
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
       </div>
+
+      {/* Widget Activités en attente — secretaire/admin uniquement */}
+      {(profile?.role === 'admin' || profile?.role === 'secretaire') && (
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.8 }}
+          className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100"
+        >
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <ClipboardList className="text-orange-500" />
+              Activités en attente de validation
+              {pendingActivitiesList.length > 0 && (
+                <span className="bg-orange-100 text-orange-600 text-sm font-bold px-2.5 py-0.5 rounded-full">
+                  {stats.pendingActivities}
+                </span>
+              )}
+            </h2>
+            <button
+              onClick={() => navigate('/activites')}
+              className="text-xs font-bold text-uvci-purple hover:underline"
+            >
+              Gérer toutes les activités
+            </button>
+          </div>
+
+          {pendingActivitiesList.length === 0 ? (
+            <div className="flex flex-col items-center py-12 gap-4 text-center">
+              <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center text-uvci-green">
+                <CheckCircle2 size={32} />
+              </div>
+              <p className="font-bold text-slate-600">Aucune activité en attente ! 🎉</p>
+              <p className="text-sm text-slate-400">Toutes les déclarations ont été traitées.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pendingActivitiesList.map((activity) => {
+                const teacher = users.find(u => u.id === activity.id_utilisateur);
+                return (
+                  <div
+                    key={activity.id}
+                    className="flex items-center gap-4 p-4 bg-orange-50/60 border border-orange-100 rounded-2xl hover:bg-orange-50 transition-colors"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-500 flex items-center justify-center shrink-0">
+                      <Clock3 size={20} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-900 truncate">
+                        {(activity as any).cours?.intitule || activity.type_action} — {activity.volume_horaire}h
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        Par {teacher ? `${teacher.prenom} ${teacher.nom}` : '...'} · {new Date(activity.date_saisie).toLocaleDateString('fr-FR')}
+                      </p>
+                    </div>
+                    <span className="badge badge-sm bg-orange-100 text-orange-600 border-none font-bold shrink-0">
+                      {activity.statut === 'soumise' ? 'Soumise' : 'En attente'}
+                    </span>
+                    <button
+                      onClick={() => navigate('/activites')}
+                      className="btn btn-sm btn-uvci-purple rounded-xl text-xs"
+                    >
+                      Valider
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </motion.div>
+      )}
     </div>
   );
 }

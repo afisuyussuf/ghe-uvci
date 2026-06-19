@@ -142,6 +142,9 @@ model AuditLog {
   userEmail       String?
   details         String?
   timestamp       DateTime @default(now())
+  ip_address      String?
+  user_agent      String?
+  device          String?  // Mobile, Tablette, Desktop, etc.
 }
 
 model Notification {

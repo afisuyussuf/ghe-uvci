@@ -25,7 +25,10 @@ import {
   Table as TableIcon,
   X,
   AlertCircle,
-  Info
+  Info,
+  CalendarDays,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react';
 import { UserProfile, Departement, Contrat, Grade } from '../types';
 import { getThemedSwal } from '../lib/swal';
@@ -47,6 +50,7 @@ export default function Teachers() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<UserProfile | null>(null);
   const [viewingTeacher, setViewingTeacher] = useState<UserProfile | null>(null);
+  const [viewTab, setViewTab] = useState<'info' | 'disponibilites'>('info');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [filterDept, setFilterDept] = useState('');
@@ -69,6 +73,27 @@ export default function Teachers() {
   const [contractFile, setContractFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [teacherAvailability, setTeacherAvailability] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (viewingTeacher?.id) {
+      fetch(`/api/disponibilites?userId=${viewingTeacher.id}`)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            setTeacherAvailability(data);
+          } else {
+            setTeacherAvailability([]);
+          }
+        })
+        .catch(err => {
+          console.error("Failed to fetch teacher availability:", err);
+          setTeacherAvailability([]);
+        });
+    } else {
+      setTeacherAvailability([]);
+    }
+  }, [viewingTeacher]);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -109,6 +134,7 @@ export default function Teachers() {
 
   const handleOpenViewModal = (teacher: UserProfile) => {
     setViewingTeacher(teacher);
+    setViewTab('info');
     setIsViewModalOpen(true);
   };
 
@@ -832,6 +858,7 @@ export default function Teachers() {
       {/* Modal Vue Enseignant */}
       <dialog className={`modal ${isViewModalOpen ? 'modal-open' : ''}`}>
         <div className="modal-box max-w-4xl rounded-[2rem] p-0 bg-white overflow-hidden">
+          {/* Header violet */}
           <div className="bg-uvci-purple p-8 text-white relative">
             <button 
               onClick={() => setIsViewModalOpen(false)}
@@ -857,129 +884,266 @@ export default function Teachers() {
                   <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-bold backdrop-blur-sm">
                     {departements.find(d => d.id === viewingTeacher?.id_departement)?.libelle || 'N/A'}
                   </span>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold backdrop-blur-sm ${viewingTeacher?.actif ? 'bg-uvci-green/30 text-white' : 'bg-red-500/30 text-white'}`}>
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold backdrop-blur-sm ${
+                    viewingTeacher?.actif ? 'bg-uvci-green/30 text-white' : 'bg-red-500/30 text-white'
+                  }`}>
                     {viewingTeacher?.actif ? 'Compte Actif' : 'Compte Inactif'}
                   </span>
                 </div>
               </div>
             </div>
+
+            {/* Onglets */}
+            <div className="flex gap-2 mt-6">
+              <button
+                onClick={() => setViewTab('info')}
+                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
+                  viewTab === 'info'
+                    ? 'bg-white text-uvci-purple shadow'
+                    : 'bg-white/10 text-white/70 hover:bg-white/20'
+                }`}
+              >
+                <Info size={16} /> Informations
+              </button>
+              <button
+                onClick={() => setViewTab('disponibilites')}
+                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
+                  viewTab === 'disponibilites'
+                    ? 'bg-white text-uvci-purple shadow'
+                    : 'bg-white/10 text-white/70 hover:bg-white/20'
+                }`}
+              >
+                <CalendarDays size={16} />
+                Disponibilités
+                <span className="bg-uvci-green/30 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
+                  {teacherAvailability.filter(d => d.actif).length}
+                </span>
+              </button>
+            </div>
           </div>
 
-          <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="md:col-span-2 space-y-8">
-              <section>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <Info size={14} /> Informations Personnelles
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="space-y-1">
-                    <p className="text-xs text-slate-500">Email Académique</p>
-                    <p className="font-bold text-black flex items-center gap-2">
-                      <Mail size={16} className="text-uvci-purple" />
-                      {viewingTeacher?.email}
-                    </p>
+          {/* Contenu par onglet */}
+          {viewTab === 'info' ? (
+            <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="md:col-span-2 space-y-8">
+                <section>
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <Info size={14} /> Informations Personnelles
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="space-y-1">
+                      <p className="text-xs text-slate-500">Email Académique</p>
+                      <p className="font-bold text-black flex items-center gap-2">
+                        <Mail size={16} className="text-uvci-purple" />
+                        {viewingTeacher?.email}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-slate-500">Téléphone</p>
+                      <p className="font-bold text-black flex items-center gap-2">
+                        <Phone size={16} className="text-uvci-purple" />
+                        {viewingTeacher?.telephone || 'Non renseigné'}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-slate-500">Genre</p>
+                      <p className="font-bold text-black capitalize">{viewingTeacher?.sexe || 'Non renseigné'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-slate-500">Adresse</p>
+                      <p className="font-bold text-black">{viewingTeacher?.adresse || 'Non renseignée'}</p>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-slate-500">Téléphone</p>
-                    <p className="font-bold text-black flex items-center gap-2">
-                      <Phone size={16} className="text-uvci-purple" />
-                      {viewingTeacher?.telephone || 'Non renseigné'}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-slate-500">Genre</p>
-                    <p className="font-bold text-black capitalize">{viewingTeacher?.sexe || 'Non renseigné'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-slate-500">Adresse</p>
-                    <p className="font-bold text-black">{viewingTeacher?.adresse || 'Non renseignée'}</p>
-                  </div>
-                </div>
-              </section>
+                </section>
 
-              <section>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <Briefcase size={14} /> Détails Professionnels
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-3xl">
-                  <div className="space-y-1">
-                    <p className="text-xs text-slate-500">Type de Contrat</p>
-                    <p className="font-bold text-black">
-                      {contrats.find(c => c.id === viewingTeacher?.id_contrat)?.libelle || 'N/A'}
-                    </p>
+                <section>
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <Briefcase size={14} /> Détails Professionnels
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-3xl">
+                    <div className="space-y-1">
+                      <p className="text-xs text-slate-500">Type de Contrat</p>
+                      <p className="font-bold text-black">
+                        {contrats.find(c => c.id === viewingTeacher?.id_contrat)?.libelle || 'N/A'}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-slate-500">Taux Horaire</p>
+                      <p className="text-2xl font-bold text-uvci-green">
+                        {viewingTeacher?.taux_horaire?.toLocaleString() || 0} <span className="text-xs">FCFA/h</span>
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-slate-500">Salaire de Base (Contrat)</p>
+                      <p className="font-bold text-black">
+                        {contrats.find(c => c.id === viewingTeacher?.id_contrat)?.salaire?.toLocaleString() || 0} FCFA
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-slate-500">Charge Horaire Min/Max</p>
+                      <p className="font-bold text-black">
+                        {contrats.find(c => c.id === viewingTeacher?.id_contrat)?.nb_heures_min || 0}h -{' '}
+                        {contrats.find(c => c.id === viewingTeacher?.id_contrat)?.nb_heures_max || 0}h
+                      </p>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-slate-500">Taux Horaire</p>
-                    <p className="text-2xl font-bold text-uvci-green">
-                      {viewingTeacher?.taux_horaire?.toLocaleString() || 0} <span className="text-xs">FCFA/h</span>
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-slate-500">Salaire de Base (Contrat)</p>
-                    <p className="font-bold text-black">
-                      {contrats.find(c => c.id === viewingTeacher?.id_contrat)?.salaire?.toLocaleString() || 0} FCFA
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-slate-500">Charge Horaire Min/Max</p>
-                    <p className="font-bold text-black">
-                      {contrats.find(c => c.id === viewingTeacher?.id_contrat)?.nb_heures_min || 0}h - {contrats.find(c => c.id === viewingTeacher?.id_contrat)?.nb_heures_max || 0}h
-                    </p>
-                  </div>
-                </div>
-              </section>
-            </div>
+                </section>
+              </div>
 
-            <div className="space-y-6">
-              <section className="bg-slate-900 text-white p-6 rounded-3xl">
-                <h4 className="text-xs font-bold text-white/50 uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <FileText size={14} /> Documents
-                </h4>
-                <div className="space-y-4">
-                  <div className="p-4 bg-white/10 rounded-2xl border border-white/10">
-                    <p className="text-xs text-white/50 mb-2">Contrat de Travail</p>
-                    {viewingTeacher?.contrat_url ? (
-                      <a 
-                        href={viewingTeacher.contrat_url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="btn btn-white btn-sm w-full rounded-xl gap-2"
-                      >
-                        <Eye size={16} />
-                        Voir le PDF
-                      </a>
-                    ) : (
-                      <div className="flex items-center gap-2 text-sm text-white/30 italic">
-                        <AlertCircle size={16} />
-                        Aucun document
-                      </div>
-                    )}
+              <div className="space-y-6">
+                <section className="bg-slate-900 text-white p-6 rounded-3xl">
+                  <h4 className="text-xs font-bold text-white/50 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <FileText size={14} /> Documents
+                  </h4>
+                  <div className="space-y-4">
+                    <div className="p-4 bg-white/10 rounded-2xl border border-white/10">
+                      <p className="text-xs text-white/50 mb-2">Contrat de Travail</p>
+                      {viewingTeacher?.contrat_url ? (
+                        <a 
+                          href={viewingTeacher.contrat_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="btn btn-white btn-sm w-full rounded-xl gap-2"
+                        >
+                          <Eye size={16} />
+                          Voir le PDF
+                        </a>
+                      ) : (
+                        <div className="flex items-center gap-2 text-sm text-white/30 italic">
+                          <AlertCircle size={16} />
+                          Aucun document
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </section>
+                </section>
 
-              <div className="p-6 border border-slate-100 rounded-3xl space-y-4">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Actions Rapides</h4>
-                <button 
-                  onClick={() => viewingTeacher && generateIndividualSheet(viewingTeacher)}
-                  className="btn btn-outline btn-uvci-purple btn-sm w-full rounded-xl gap-2"
-                >
-                  <Download size={16} />
-                  Fiche Individuelle
-                </button>
-                <button 
-                  onClick={() => {
-                    setIsViewModalOpen(false);
-                    handleOpenModal(viewingTeacher);
-                  }}
-                  className="btn btn-outline btn-sm w-full rounded-xl gap-2"
-                >
-                  <Edit2 size={16} />
-                  Modifier le profil
-                </button>
+                <div className="p-6 border border-slate-100 rounded-3xl space-y-4">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Actions Rapides</h4>
+                  <button 
+                    onClick={() => viewingTeacher && generateIndividualSheet(viewingTeacher)}
+                    className="btn btn-outline btn-uvci-purple btn-sm w-full rounded-xl gap-2"
+                  >
+                    <Download size={16} />
+                    Fiche Individuelle
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setIsViewModalOpen(false);
+                      handleOpenModal(viewingTeacher);
+                    }}
+                    className="btn btn-outline btn-sm w-full rounded-xl gap-2"
+                  >
+                    <Edit2 size={16} />
+                    Modifier le profil
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            /* Onglet Disponibilités */
+            <div className="p-8">
+              {teacherAvailability.length === 0 ? (
+                <div className="text-center py-16 space-y-4">
+                  <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-300">
+                    <CalendarDays size={40} />
+                  </div>
+                  <p className="font-bold text-slate-500">Aucune disponibilité enregistrée</p>
+                  <p className="text-sm text-slate-400">Cet enseignant n'a pas encore renseigné ses créneaux.</p>
+                </div>
+              ) : (() => {
+                const JOURS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+                const CRENEAUX = ['Matin', 'Après-midi', 'Soir'];
+                const isAvailable = (jour: string, creneau: string) =>
+                  teacherAvailability.some(
+                    d => d.jour === jour && d.creneau === creneau && d.actif !== false
+                  );
+                const totalSlots = teacherAvailability.filter(d => d.actif !== false).length;
+
+                return (
+                  <div className="space-y-6">
+                    {/* Stats rapides */}
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="bg-uvci-green/10 rounded-2xl p-4 text-center">
+                        <p className="text-3xl font-bold text-uvci-green">{totalSlots}</p>
+                        <p className="text-xs text-slate-500 mt-1">Créneaux disponibles</p>
+                      </div>
+                      <div className="bg-uvci-purple/10 rounded-2xl p-4 text-center">
+                        <p className="text-3xl font-bold text-uvci-purple">
+                          {new Set(teacherAvailability.filter(d => d.actif !== false).map((d: any) => d.jour)).size}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">Jours disponibles</p>
+                      </div>
+                      <div className="bg-slate-100 rounded-2xl p-4 text-center">
+                        <p className="text-3xl font-bold text-slate-700">
+                          {Math.round((totalSlots / 18) * 100)}%
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">Disponibilité semaine</p>
+                      </div>
+                    </div>
+
+                    {/* Grille hebdomadaire */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr>
+                            <th className="w-28 p-3 text-left text-xs font-bold text-slate-400 uppercase">Créneau</th>
+                            {JOURS.map(j => (
+                              <th key={j} className="p-3 text-center text-xs font-bold text-slate-600">{j}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {CRENEAUX.map(creneau => (
+                            <tr key={creneau}>
+                              <td className="p-3">
+                                <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                                  {creneau}
+                                </span>
+                              </td>
+                              {JOURS.map(jour => {
+                                const available = isAvailable(jour, creneau);
+                                return (
+                                  <td key={jour} className="p-2 text-center">
+                                    <div className={`mx-auto w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                                      available
+                                        ? 'bg-uvci-green/15 text-uvci-green'
+                                        : 'bg-slate-50 text-slate-200'
+                                    }`}>
+                                      {available
+                                        ? <CheckCircle2 size={20} strokeWidth={2.5} />
+                                        : <XCircle size={20} strokeWidth={1.5} />
+                                      }
+                                    </div>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Légende */}
+                    <div className="flex items-center gap-6 text-xs text-slate-500 pt-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded-md bg-uvci-green/15 flex items-center justify-center">
+                          <CheckCircle2 size={12} className="text-uvci-green" />
+                        </div>
+                        <span>Disponible</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded-md bg-slate-50 flex items-center justify-center">
+                          <XCircle size={12} className="text-slate-200" />
+                        </div>
+                        <span>Non disponible</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
         </div>
       </dialog>
     </div>

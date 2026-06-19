@@ -200,6 +200,9 @@ export interface AuditLog {
   details: string;
   timestamp: string;
   targetId?: string;
+  ip_address?: string;
+  user_agent?: string;
+  device?: string;
 }
 
 export interface AppNotification {
